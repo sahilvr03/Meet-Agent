@@ -355,32 +355,35 @@ export default function ClientApp({ initialMeetings }) {
       alert(`Failed to download ${format} file`);
     }
   };
+  
 
-  const attemptReconnect = async (stream, mediaRecorder) => {
+const attemptReconnect = async (stream, mediaRecorder) => {
     if (!user) {
-      alert("You must be logged in to use live transcription!");
-      return;
+        alert("You must be logged in to use live transcription!");
+        return;
     }
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-      alert("Unable to connect to live transcription service after multiple attempts. Please ensure the backend server is running and try again.");
-      setIsLiveRecording(false);
-      setWebSocket(null);
-      setReconnectAttempts(0);
-      mediaRecorder.stop();
-      stream.getTracks().forEach(track => track.stop());
-      return;
+        alert("Unable to connect to live transcription service after multiple attempts. Please ensure the backend server is running and try again.");
+        setIsLiveRecording(false);
+        setWebSocket(null);
+        setReconnectAttempts(0);
+        mediaRecorder.stop();
+        stream.getTracks().forEach(track => track.stop());
+        return;
     }
 
     setReconnectAttempts(prev => prev + 1);
     console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}...`);
 
     const idToken = await auth.currentUser.getIdToken();
-    const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}`);
+    // ADD TOKEN TO WEBSOCKET URL
+    const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}&token=${idToken}`);
+    
     ws.onopen = () => {
-      console.log("WebSocket reconnected successfully");
-      setWebSocket(ws);
-      setReconnectAttempts(0);
-      mediaRecorder.start(1000);
+        console.log("WebSocket reconnected successfully");
+        setWebSocket(ws);
+        setReconnectAttempts(0);
+        mediaRecorder.start(1000);
     };
 
     ws.onmessage = (event) => {
@@ -417,35 +420,37 @@ export default function ClientApp({ initialMeetings }) {
     setWebSocket(ws);
   };
 
-  const toggleLiveRecording = async () => {
+const toggleLiveRecording = async () => {
     if (!user) {
-      alert("You must be logged in to use live transcription!");
-      return;
+        alert("You must be logged in to use live transcription!");
+        return;
     }
     if (isLiveRecording) {
-      if (webSocket) {
-        webSocket.close();
-        setWebSocket(null);
-      }
-      setIsLiveRecording(false);
-      setLiveTranscript("");
-      setLivePoints({ key_points: [], action_items: [], sentiment: "neutral" });
-      setLiveRunId(null);
-      setReconnectAttempts(0);
-      fetchMeetings(user.uid);
+        if (webSocket) {
+            webSocket.close();
+            setWebSocket(null);
+        }
+        setIsLiveRecording(false);
+        setLiveTranscript("");
+        setLivePoints({ key_points: [], action_items: [], sentiment: "neutral" });
+        setLiveRunId(null);
+        setReconnectAttempts(0);
+        fetchMeetings(user.uid);
     } else {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-        const idToken = await auth.currentUser.getIdToken();
-        const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}`);
-        
-        ws.onopen = () => {
-          console.log("WebSocket connected");
-          setWebSocket(ws);
-          setIsLiveRecording(true);
-          mediaRecorder.start(1000);
-        };
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+            const idToken = await auth.currentUser.getIdToken();
+            
+            // ADD TOKEN TO WEBSOCKET URL
+            const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}&token=${idToken}`);
+            
+            ws.onopen = () => {
+                console.log("WebSocket connected");
+                setWebSocket(ws);
+                setIsLiveRecording(true);
+                mediaRecorder.start(100000);
+            };
 
         ws.onmessage = (event) => {
           try {
@@ -459,8 +464,9 @@ export default function ClientApp({ initialMeetings }) {
             if (!liveRunId && data.run_id) {
               setLiveRunId(data.run_id);
             }
-          } catch (err) {
-            console.error("Error parsing WebSocket message:", err);
+          } catch (error) {
+            console.error("Error starting live recording:", error);
+            alert("Failed to access microphone or connect to server. Please check permissions and server status.");
           }
         };
 
