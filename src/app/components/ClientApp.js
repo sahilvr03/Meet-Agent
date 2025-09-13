@@ -1,6 +1,4 @@
-
 "use client";
-
 import React, { useState, useEffect } from "react";
 import MeetingItem from './MeetingItem';
 import ActionItemDisplay from './ActionItemDisplay';
@@ -8,7 +6,7 @@ import ChatInterface from './ChatInterface';
 import Sidebar from './Sidebar';
 import MainContent from './MainContent';
 import { auth, googleProvider } from '../config/firebase-config';
-import { onAuthStateChanged, signInWithPopup } from "firebase/auth";
+import { onAuthStateChanged, signInWithPopup, signOut } from "firebase/auth";
 
 const languageOptions = [
   { value: "en", label: "English" },
@@ -74,7 +72,6 @@ export default function ClientApp({ initialMeetings }) {
         setMeetings([]);
       }
     });
-
     return () => {
       unsubscribe();
       if (webSocket) {
@@ -89,6 +86,15 @@ export default function ClientApp({ initialMeetings }) {
     } catch (error) {
       console.error("Login error:", error);
       alert("Failed to log in with Google. Please try again.");
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Failed to log out. Please try again.");
     }
   };
 
@@ -204,6 +210,7 @@ export default function ClientApp({ initialMeetings }) {
       });
       if (!res.ok) throw new Error("Failed to delete conversation");
       alert("Conversation deleted successfully");
+      // Refresh the chat data
       setSelectedMeeting({ ...selectedMeeting, run_id });
     } catch (err) {
       console.error("Delete conversation error:", err);
@@ -241,7 +248,7 @@ export default function ClientApp({ initialMeetings }) {
       const idToken = await auth.currentUser.getIdToken();
       const res = await fetch(`http://localhost:8000/conversations/${run_id}/${chat_id}`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`
         },
@@ -315,7 +322,7 @@ export default function ClientApp({ initialMeetings }) {
       const idToken = await auth.currentUser.getIdToken();
       const res = await fetch(`http://localhost:8000/meetings/${run_id}`, {
         method: "PUT",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`
         },
@@ -326,7 +333,7 @@ export default function ClientApp({ initialMeetings }) {
       await fetchMeetings(user.uid);
     } catch (err) {
       console.error("Rename meeting error:", err);
-      alert("Failed to rename meeting");
+      alert("Failed to delete meeting");
     }
   };
 
@@ -355,37 +362,32 @@ export default function ClientApp({ initialMeetings }) {
       alert(`Failed to download ${format} file`);
     }
   };
-  
 
-const attemptReconnect = async (stream, mediaRecorder) => {
+  const attemptReconnect = async (stream, mediaRecorder) => {
     if (!user) {
-        alert("You must be logged in to use live transcription!");
-        return;
+      alert("You must be logged in to use live transcription!");
+      return;
     }
     if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-        alert("Unable to connect to live transcription service after multiple attempts. Please ensure the backend server is running and try again.");
-        setIsLiveRecording(false);
-        setWebSocket(null);
-        setReconnectAttempts(0);
-        mediaRecorder.stop();
-        stream.getTracks().forEach(track => track.stop());
-        return;
+      alert("Unable to connect to live transcription service after multiple attempts. Please ensure the backend server is running and try again.");
+      setIsLiveRecording(false);
+      setWebSocket(null);
+      setReconnectAttempts(0);
+      mediaRecorder.stop();
+      stream.getTracks().forEach(track => track.stop());
+      return;
     }
-
     setReconnectAttempts(prev => prev + 1);
     console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts + 1}/${MAX_RECONNECT_ATTEMPTS}...`);
-
     const idToken = await auth.currentUser.getIdToken();
-    // ADD TOKEN TO WEBSOCKET URL
     const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}&token=${idToken}`);
-    
-    ws.onopen = () => {
-        console.log("WebSocket reconnected successfully");
-        setWebSocket(ws);
-        setReconnectAttempts(0);
-        mediaRecorder.start(1000);
-    };
 
+    ws.onopen = () => {
+      console.log("WebSocket reconnected successfully");
+      setWebSocket(ws);
+      setReconnectAttempts(0);
+      mediaRecorder.start(1000);
+    };
     ws.onmessage = (event) => {
       try {
         const data = JSON.parse(event.data);
@@ -402,7 +404,6 @@ const attemptReconnect = async (stream, mediaRecorder) => {
         console.error("Error parsing WebSocket message:", err);
       }
     };
-
     ws.onclose = () => {
       console.log("WebSocket closed during reconnect");
       mediaRecorder.stop();
@@ -411,47 +412,43 @@ const attemptReconnect = async (stream, mediaRecorder) => {
       setWebSocket(null);
       fetchMeetings(user.uid);
     };
-
     ws.onerror = (error) => {
       console.error(`WebSocket reconnect error (attempt ${reconnectAttempts + 1}):`, error);
       attemptReconnect(stream, mediaRecorder);
     };
-
     setWebSocket(ws);
   };
 
-const toggleLiveRecording = async () => {
+  const toggleLiveRecording = async () => {
     if (!user) {
-        alert("You must be logged in to use live transcription!");
-        return;
+      alert("You must be logged in to use live transcription!");
+      return;
     }
     if (isLiveRecording) {
-        if (webSocket) {
-            webSocket.close();
-            setWebSocket(null);
-        }
-        setIsLiveRecording(false);
-        setLiveTranscript("");
-        setLivePoints({ key_points: [], action_items: [], sentiment: "neutral" });
-        setLiveRunId(null);
-        setReconnectAttempts(0);
-        fetchMeetings(user.uid);
+      if (webSocket) {
+        webSocket.close();
+        setWebSocket(null);
+      }
+      setIsLiveRecording(false);
+      setLiveTranscript("");
+      setLivePoints({ key_points: [], action_items: [], sentiment: "neutral" });
+      setLiveRunId(null);
+      setReconnectAttempts(0);
+      fetchMeetings(user.uid);
     } else {
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-            const idToken = await auth.currentUser.getIdToken();
-            
-            // ADD TOKEN TO WEBSOCKET URL
-            const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}&token=${idToken}`);
-            
-            ws.onopen = () => {
-                console.log("WebSocket connected");
-                setWebSocket(ws);
-                setIsLiveRecording(true);
-                mediaRecorder.start(100000);
-            };
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+        const idToken = await auth.currentUser.getIdToken();
 
+        const ws = new WebSocket(`ws://localhost:8000/live-transcribe?language=${selectedLanguage}&user_id=${user.uid}&token=${idToken}`);
+
+        ws.onopen = () => {
+          console.log("WebSocket connected");
+          setWebSocket(ws);
+          setIsLiveRecording(true);
+          mediaRecorder.start(5000);
+        };
         ws.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
@@ -464,12 +461,10 @@ const toggleLiveRecording = async () => {
             if (!liveRunId && data.run_id) {
               setLiveRunId(data.run_id);
             }
-          } catch (error) {
-            console.error("Error starting live recording:", error);
-            alert("Failed to access microphone or connect to server. Please check permissions and server status.");
+          } catch (err) {
+            console.error("Error parsing WebSocket message:", err);
           }
         };
-
         ws.onclose = () => {
           console.log("WebSocket closed");
           mediaRecorder.stop();
@@ -478,20 +473,17 @@ const toggleLiveRecording = async () => {
           setWebSocket(null);
           fetchMeetings(user.uid);
         };
-
         ws.onerror = (error) => {
           console.error("WebSocket error:", error);
           mediaRecorder.stop();
           stream.getTracks().forEach(track => track.stop());
           attemptReconnect(stream, mediaRecorder);
         };
-
         mediaRecorder.ondataavailable = (event) => {
           if (event.data.size > 0 && ws.readyState === WebSocket.OPEN) {
             ws.send(event.data);
           }
         };
-
         mediaRecorder.onstop = () => {
           stream.getTracks().forEach(track => track.stop());
         };
@@ -523,6 +515,7 @@ const toggleLiveRecording = async () => {
     return (
       <ChatInterface
         meeting={selectedMeeting}
+        user={user}
         onBack={() => {
           setView("upload");
           setSelectedMeeting(null);
@@ -546,6 +539,8 @@ const toggleLiveRecording = async () => {
         deleteMeeting={deleteMeeting}
         renameMeeting={renameMeeting}
         downloadMeeting={downloadMeeting}
+        user={user}
+        handleLogout={handleLogout}
       />
       <MainContent
         file={file}

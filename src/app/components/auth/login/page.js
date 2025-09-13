@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -20,7 +19,6 @@ export default function Login() {
   const searchParams = useSearchParams();
   const redirect = searchParams.get("redirect") || "/";
 
-  // ✅ Save to backend
   const saveUserToBackend = async (firebaseUser, provider = "email") => {
     try {
       await axios.post("http://localhost:8000/auth/save-user", {
@@ -78,7 +76,6 @@ export default function Login() {
         </h1>
         {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
         <div className="space-y-4">
-          {/* Email Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Email
@@ -97,8 +94,6 @@ export default function Login() {
               />
             </div>
           </div>
-
-          {/* Password Input */}
           <div>
             <label className="block text-sm font-medium text-gray-700">
               Password
@@ -117,8 +112,6 @@ export default function Login() {
               />
             </div>
           </div>
-
-          {/* Email Sign In */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -129,8 +122,6 @@ export default function Login() {
             {loading && <Loader2 className="animate-spin" size={18} />}
             Sign In with Email
           </motion.button>
-
-          {/* Google Sign In */}
           <motion.button
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
@@ -159,10 +150,8 @@ export default function Login() {
             </svg>
             Sign In with Google
           </motion.button>
-
-          {/* Signup Link */}
           <p className="text-sm text-center text-gray-600">
-            Don&apos;t have an account?{" "}
+            Don t have an account?{" "}
             <a href="/auth/signup" className="text-blue-600 hover:underline">
               Sign Up
             </a>

@@ -1,6 +1,4 @@
-// components/ActionItemDisplay.js
 "use client";
-
 import React from "react";
 import { motion } from "framer-motion";
 import { Zap, User, Calendar } from "lucide-react";

@@ -1,6 +1,4 @@
-// components/MeetingItem.js
 "use client";
-
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { FileAudio, MoreVertical, Edit, Trash2, FileText, FileSpreadsheet } from "lucide-react";
@@ -49,7 +47,6 @@ const MeetingItem = ({ meeting, onClick, deleteMeeting, renameMeeting, downloadM
         </div>
       ) : (
         <div className="flex items-center justify-between">
-          {/* Left Section - Meeting Info */}
           <div
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => onClick(meeting)}
@@ -64,8 +61,6 @@ const MeetingItem = ({ meeting, onClick, deleteMeeting, renameMeeting, downloadM
               </p>
             </div>
           </div>
-
-          {/* Right Section - 3 Dot Menu */}
           <div className="relative">
             <button
               onClick={() => setShowMenu(!showMenu)}
@@ -73,7 +68,6 @@ const MeetingItem = ({ meeting, onClick, deleteMeeting, renameMeeting, downloadM
             >
               <MoreVertical size={18} className="text-gray-600" />
             </button>
-
             {showMenu && (
               <motion.div
                 initial={{ opacity: 0, y: -5 }}

@@ -1,14 +1,10 @@
-// components/ChatInterface.js
 "use client";
-
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowLeft, MessageSquare, Send, User, Bot, Calendar } from "lucide-react";
-import ActionItemDisplay from './ActionItemDisplay'; // If needed, but in original it's not directly used here
-import { useAuth } from './AuthProvider';
+import ActionItemDisplay from './ActionItemDisplay';
 
-const ChatInterface = ({ meeting, onBack }) => {
-  const { user } = useAuth();
+const ChatInterface = ({ meeting, user, onBack, deleteConversation, deleteAllConversations, updateConversation, downloadConversations }) => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -16,15 +12,22 @@ const ChatInterface = ({ meeting, onBack }) => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (meeting?.run_id) {
-      loadMeetingData(meeting.run_id);
-      loadConversations(meeting.run_id);
-    }
+    const loadData = async () => {
+      if (meeting?.run_id && user) {
+        await loadMeetingData(meeting.run_id);
+        await loadConversations(meeting.run_id);
+      }
+    };
+    loadData();
   }, [meeting]);
 
   const loadMeetingData = async (runId) => {
     try {
-      const res = await fetch(`http://localhost:8000/status/${runId}`);
+      const idToken = await user.getIdToken();
+      const res = await fetch(`http://localhost:8000/status/${runId}`, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      if (!res.ok) throw new Error("Failed to load meeting data");
       const data = await res.json();
       if (data.result) {
         setMeetingData(data.result);
@@ -43,15 +46,18 @@ const ChatInterface = ({ meeting, onBack }) => {
 
   const loadConversations = async (runId) => {
     try {
-      if (!user) return;
-      const res = await fetch(`http://localhost:8000/conversations/${runId}?user_id=${user.uid}`);
+      const idToken = await user.getIdToken();
+      const res = await fetch(`http://localhost:8000/conversations/${runId}`, {
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      if (!res.ok) throw new Error("Failed to load conversations");
       const data = await res.json();
       if (data.conversations && data.conversations.length > 0) {
         const formattedMessages = data.conversations.flatMap(conv => [
           { type: 'user', content: conv.message, timestamp: conv.timestamp },
           { type: 'assistant', content: conv.response, timestamp: conv.timestamp }
         ]);
-        setMessages(prev => [...formattedMessages, ...prev]);
+        setMessages(prev => [...prev, ...formattedMessages]);
       }
     } catch (error) {
       console.error("Error loading conversations:", error);
@@ -60,13 +66,10 @@ const ChatInterface = ({ meeting, onBack }) => {
 
   const formatMeetingData = (data) => {
     if (!data) return "";
-
     let formatted = "";
-
     if (data.summary) {
       formatted += `SUMMARY:\n${data.summary}\n\n`;
     }
-
     if (data.key_points && data.key_points.length > 0) {
       formatted += "KEY POINTS:\n";
       data.key_points.forEach(point => {
@@ -74,7 +77,6 @@ const ChatInterface = ({ meeting, onBack }) => {
       });
       formatted += "\n";
     }
-
     if (data.decisions && data.decisions.length > 0) {
       formatted += "DECISIONS:\n";
       data.decisions.forEach(decision => {
@@ -82,7 +84,6 @@ const ChatInterface = ({ meeting, onBack }) => {
       });
       formatted += "\n";
     }
-
     if (data.action_items && data.action_items.length > 0) {
       formatted += "ACTION ITEMS:\n";
       data.action_items.forEach(item => {
@@ -94,11 +95,9 @@ const ChatInterface = ({ meeting, onBack }) => {
       });
       formatted += "\n";
     }
-
     if (data.sentiment) {
       formatted += `SENTIMENT: ${data.sentiment}\n`;
     }
-
     return formatted.trim();
   };
 
@@ -110,14 +109,20 @@ const ChatInterface = ({ meeting, onBack }) => {
       timestamp: new Date().toISOString()
     };
     setMessages(prev => [...prev, userMessage]);
+    const tempInput = input;
     setInput("");
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/chat/${meeting.run_id}?user_id=${user.uid}`, {
+      const idToken = await user.getIdToken();
+      const res = await fetch(`http://localhost:8000/chat/${meeting.run_id}`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: input })
+        headers: { 
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`
+        },
+        body: JSON.stringify({ message: tempInput })
       });
+      if (!res.ok) throw new Error("Failed to send message");
       const data = await res.json();
       const assistantMessage = {
         type: 'assistant',
